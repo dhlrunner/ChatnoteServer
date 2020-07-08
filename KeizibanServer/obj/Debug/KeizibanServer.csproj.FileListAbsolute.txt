@@ -1,0 +1,9 @@
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\bin\Debug\KeizibanServer.exe.config
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\bin\Debug\KeizibanServer.exe
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\bin\Debug\KeizibanServer.pdb
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\bin\Debug\Newtonsoft.Json.dll
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\bin\Debug\Newtonsoft.Json.xml
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\obj\Debug\KeizibanServer.csprojAssemblyReference.cache
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\obj\Debug\KeizibanServer.csproj.CopyComplete
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\obj\Debug\KeizibanServer.exe
+C:\Users\DHL\source\repos\KeizibanServer\KeizibanServer\obj\Debug\KeizibanServer.pdb
