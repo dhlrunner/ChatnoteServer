@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -32,6 +33,17 @@ namespace KeizibanServer
                 //frm.textBox1.AppendText("Normal Stopping Service");
             }
         }
+        private static JObject getRawDetaildb(int index)
+        {
+            foreach(JObject a in mainDB)
+            {
+                if (index == Convert.ToInt32(a["index"]))
+                {
+                    return a;
+                }
+            }
+            return null;
+        }
         private static JObject convertDB(JObject a)
         {
             JObject o = new JObject();
@@ -48,8 +60,26 @@ namespace KeizibanServer
                 o.Add("author", a["author"].ToString());
             }
             o.Add("message", a["message"]);
-            o.Add("likes", Convert.ToInt32(a["likes"]));
-            o.Add("comment", a["comment"]);
+            o.Add("likes", a["likes"].Count());
+            JArray c = new JArray();
+            foreach (JObject k in a["comment"])
+            {             
+                JObject com = new JObject();
+                if (k["author"].ToString() == string.Empty)
+                {
+                    byte[] ipaddr = IPAddress.Parse(k["ipaddr"].ToString()).GetAddressBytes();
+                    com.Add("author", string.Format("匿名({0}.{1})", ipaddr[0], ipaddr[1]));
+                }
+                else
+                {
+                    com.Add("author", k["author"]);
+                }
+                
+                com.Add("timestamp", k["timestamp"]);
+                com.Add("message",k["message"]);
+                c.Add(com);
+            }
+            o.Add("comment", c);
             return o;
         }
         private static void ProcessRequest(HttpListenerContext ctx) //サーバに要求があったとき実行される関数
@@ -81,11 +111,74 @@ namespace KeizibanServer
                 addDB(JObject.Parse(Encoding.UTF8.GetString(Client_Req_data)), ctx.Request.RemoteEndPoint.Address);
                 ResponceProcessBinary(ctx, Encoding.UTF8.GetBytes("OK"));
             }
+            else if (ctx.Request.Url.LocalPath.Contains("/is_likeable"))
+            {
+                bool ret = true;
+                byte[] Client_Req_data = ReadFully(ctx.Request.InputStream);
+                JObject clientreqjson = JObject.Parse(Encoding.UTF8.GetString(Client_Req_data));
+                JObject detail = getRawDetaildb(Convert.ToInt32(clientreqjson["index"]));
+                foreach (JObject a in detail["likes"])
+                {
+                    if (a["ipaddr"].ToString() == ctx.Request.RemoteEndPoint.Address.ToString())
+                    {
+                        ret = false;
+                    }
+                }
+                ResponceProcessBinary(ctx, Encoding.UTF8.GetBytes(ret.ToString()));
+            }
             else if (ctx.Request.Url.LocalPath.Contains("/getDetail"))
             {
                 byte[] reqdata = ReadFully(ctx.Request.InputStream);
                 JObject obj = JObject.Parse(Encoding.UTF8.GetString(reqdata));
                 ResponceProcessBinary(ctx, Encoding.UTF8.GetBytes(getDetailmsg(Convert.ToInt32(obj["index"])).ToString()));
+            }
+            else if (ctx.Request.Url.LocalPath.Contains("/writeComment"))
+            {
+                JObject reqdata = JObject.Parse(Encoding.UTF8.GetString(ReadFully(ctx.Request.InputStream)));
+                JObject s = new JObject();
+                s.Add("author", reqdata["author"]);
+                s.Add("timestamp", DateTimeOffset.Now.ToUnixTimeSeconds());
+                s.Add("message", reqdata["message"]);
+                s.Add("ipaddr", ctx.Request.RemoteEndPoint.Address.ToString());
+
+                for (int i = 0; i < mainDB.Count(); i++)
+                {
+                    if (Convert.ToInt32(reqdata["index"]) == Convert.ToInt32(mainDB[i]["index"]))
+                    {                       
+                        JArray comm = (JArray)mainDB[i]["comment"];
+                        comm.Add(s);
+                        ResponceProcessBinary(ctx, Encoding.UTF8.GetBytes("OK"));
+                        saveDB();
+                        return;
+                    } 
+                }
+                    ResponceProcessBinary(ctx, Encoding.UTF8.GetBytes("Error"));
+                
+            }
+            else if (ctx.Request.Url.LocalPath.Contains("/setLikes"))
+            {
+                JObject reqdata = JObject.Parse(Encoding.UTF8.GetString(ReadFully(ctx.Request.InputStream)));
+                try
+                {
+                    JObject o = new JObject();
+                    o.Add("author",reqdata["author"]);
+                    o.Add("ipaddr", ctx.Request.RemoteEndPoint.Address.ToString());
+                    for(int i = 0; i<mainDB.Count(); i++)
+                    {
+                        if(Convert.ToInt32(reqdata["index"]) == Convert.ToInt32(mainDB[i]["index"]))
+                        {
+                            JArray comm = (JArray)mainDB[i]["likes"];
+                            comm.Add(o);
+                        }
+                    }
+                    saveDB();
+                    ResponceProcessBinary(ctx, Encoding.UTF8.GetBytes("OK"));
+                }
+                catch(Exception ex)
+                {
+                    Debug.WriteLine(ex);
+                    ResponceProcessBinary(ctx, Encoding.UTF8.GetBytes("Error"));
+                }
             }
             else
             {
@@ -108,6 +201,7 @@ namespace KeizibanServer
                 if(Convert.ToInt32(msg["index"]) == index)
                 {
                     ret = convertDB((JObject)msg);
+                    //ret["likes"].Remove();
                     return ret;
                 }
             }
@@ -154,7 +248,7 @@ namespace KeizibanServer
             add.Add("title", d["title"].ToString());
             add.Add("author", d["author"].ToString());
             add.Add("ipaddr", ip.ToString());
-            add.Add("likes", 0);
+            add.Add("likes", new JArray());
             add.Add("message", d["message"].ToString());
             add.Add("comment", new JArray());
             mainDB.Add(add);
